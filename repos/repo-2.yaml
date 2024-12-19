@@ -1,0 +1,4 @@
+- team: engineers
+  permission: pull
+- team: admins
+  permission: admin
