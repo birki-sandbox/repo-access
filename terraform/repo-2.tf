@@ -1,5 +1,5 @@
-module "repo_access" {
-  source = "./modules/repo_access"
+module "access" {
+  source = "./modules/access"
 
   repo = "repo-2"
 
