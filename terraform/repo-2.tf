@@ -1,4 +1,4 @@
-resource "github_team_repository" "repo-1" {
+resource "github_team_repository" "repo-2" {
   team_id    = "engineers"
   repository = "repo-2"
   permission = "admin"
