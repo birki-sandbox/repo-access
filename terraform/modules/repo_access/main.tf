@@ -11,6 +11,12 @@ variable "access" {
   }))
 }
 
+variable "owner" {
+  description = "The owner of the GitHub repository (organization or user)"
+  type        = string
+  default     = "birki-sandbox"
+}
+
 resource "github_team_repository" "repo_access" {
   for_each   = { for team in var.access : team.team => team }
   repository = var.repo
