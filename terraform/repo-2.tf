@@ -1,11 +1,16 @@
-resource "github_team_repository" "repo-2" {
-  team_id    = "engineers"
-  repository = "repo-2"
-  permission = "push"
-}
+module "repo_access" {
+  source = "./modules/repo_access"
 
-resource "github_team_repository" "repo-2" {
-  team_id    = "admins"
-  repository = "repo-2"
-  permission = "admin"
+  repo = "repo-2"
+
+  access = [
+    {
+      team       = "engineers"
+      permission = "push"
+    },
+    {
+      team       = "admins"
+      permission = "admin"
+    }
+  ]
 }
