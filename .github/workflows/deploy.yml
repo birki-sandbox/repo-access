@@ -46,8 +46,8 @@ jobs:
         uses: actions/create-github-app-token@v1
         id: github-app-token
         with:
-          app-id: ${{ secrets.GITHUB_APP_ID }}
-          private-key: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
 
       - name: fetch terraform version
         id: terraform-version
@@ -64,5 +64,4 @@ jobs:
       - name: terraform apply
         env:
           TF_VAR_GITHUB_TOKEN: ${{ steps.github-app-token.outputs.token }}
-          TF_VAR_CLOUDFLARE_TOKEN: ${{ secrets.CLOUDFLARE_TOKEN }}
         run: terraform apply -auto-approve
