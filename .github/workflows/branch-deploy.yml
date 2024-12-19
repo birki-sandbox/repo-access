@@ -1,0 +1,106 @@
+name: branch-deploy
+
+on:
+  issue_comment:
+    types: [ created ]
+
+env:
+  WORKING_DIR: terraform/
+
+# Permissions needed for reacting and adding comments for IssueOps commands
+permissions:
+  pull-requests: write
+  deployments: write
+  contents: write
+  checks: read
+  statuses: read
+
+jobs:
+  branch-deploy:
+    name: branch-deploy
+    if: # only run on pull request comments and very specific comment body string as defined in our branch-deploy settings
+      ${{ github.event.issue.pull_request &&
+      (startsWith(github.event.comment.body, '.deploy') ||
+      startsWith(github.event.comment.body, '.noop') ||
+      startsWith(github.event.comment.body, '.lock') ||
+      startsWith(github.event.comment.body, '.help') ||
+      startsWith(github.event.comment.body, '.wcid') ||
+      startsWith(github.event.comment.body, '.unlock')) }}
+    runs-on: ubuntu-latest
+    environment: secrets
+    defaults:
+      run:
+        working-directory: ${{ env.WORKING_DIR }}
+
+    steps:
+      - name: branch-deploy
+        id: branch-deploy
+        uses: github/branch-deploy@v10
+        with:
+          admins: grantbirki
+          environment_targets: production
+          sticky_locks: "true"
+
+      - name: checkout
+        if: steps.branch-deploy.outputs.continue == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.branch-deploy.outputs.sha }}
+
+      - name: use github app token
+        if: steps.branch-deploy.outputs.continue == 'true'
+        uses: actions/create-github-app-token@v1
+        id: github-app-token
+        with:
+          app-id: ${{ secrets.GITHUB_APP_ID }}
+          private-key: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
+
+      - name: fetch terraform version
+        id: terraform-version
+        run: echo "terraform=$(cat .terraform-version)" >> $GITHUB_OUTPUT
+
+      - uses: hashicorp/setup-terraform@v3.1.2
+        if: steps.branch-deploy.outputs.continue == 'true'
+        with:
+          terraform_version: ${{ steps.terraform-version.outputs.terraform }}
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+
+      - name: terraform init
+        if: steps.branch-deploy.outputs.continue == 'true'
+        run: terraform init
+
+      - name: terraform plan
+        if: ${{ steps.branch-deploy.outputs.continue == 'true' && steps.branch-deploy.outputs.noop == 'true' }}
+        env:
+          TF_VAR_GITHUB_TOKEN: ${{ steps.github-app-token.outputs.token }}
+        id: plan
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          terraform plan -no-color -compact-warnings | tee terraform-output.txt
+
+      - name: terraform apply
+        if: ${{ steps.branch-deploy.outputs.continue == 'true' && steps.branch-deploy.outputs.noop != 'true' }}
+        env:
+          TF_VAR_GITHUB_TOKEN: ${{ steps.github-app-token.outputs.token }}
+        id: apply
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          terraform apply -no-color -auto-approve -compact-warnings | tee terraform-output.txt
+
+      - name: terratrash
+        if: ${{ steps.branch-deploy.outputs.continue == 'true' }}
+        uses: GrantBirki/terratrash-action@v1.0.0
+        with:
+          input_file_path: terraform/terraform-output.txt
+          erb_render_template: .github/deployment_message.md
+          erb_render_save_path: .github/deployment_message.md
+
+      - name: check terraform plan output
+        if: ${{ steps.branch-deploy.outputs.continue == 'true' && steps.branch-deploy.outputs.noop == 'true' && steps.plan.outcome == 'failure' }}
+        run: exit 1
+
+      - name: check terraform apply output
+        if: ${{ steps.branch-deploy.outputs.continue == 'true' && steps.branch-deploy.outputs.noop != 'true' && steps.apply.outcome == 'failure' }}
+        run: exit 1

@@ -1,0 +1,68 @@
+name: deploy
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+env:
+  WORKING_DIR: "terraform/"
+
+jobs:
+  deployment-check:
+    runs-on: ubuntu-latest
+    outputs: # set outputs for use in downstream jobs
+      continue: ${{ steps.deployment-check.outputs.continue }}
+      sha: ${{ steps.deployment-check.outputs.sha }}
+
+    steps:
+      # https://github.com/github/branch-deploy/blob/d3c24bd92505e623615b75ffdfac5ed5259adbdb/docs/merge-commit-strategy.md
+      - name: deployment check
+        uses: github/branch-deploy@v10
+        id: deployment-check
+        with:
+          merge_deploy_mode: "true"
+          environment: production
+
+  deploy:
+    if: ${{ needs.deployment-check.outputs.continue == 'true' && github.event_name == 'push' }}
+    needs: deployment-check
+    environment: production
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ env.WORKING_DIR }}
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.deployment-check.outputs.sha }}
+
+      - name: use github app token
+        uses: actions/create-github-app-token@v1
+        id: github-app-token
+        with:
+          app-id: ${{ secrets.GITHUB_APP_ID }}
+          private-key: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
+
+      - name: fetch terraform version
+        id: terraform-version
+        run: echo "terraform=$(cat .terraform-version)" >> $GITHUB_OUTPUT
+
+      - uses: hashicorp/setup-terraform@v3.1.2
+        with:
+          terraform_version: ${{ steps.terraform-version.outputs.terraform }}
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+
+      - name: terraform init
+        run: terraform init
+
+      - name: terraform apply
+        env:
+          TF_VAR_GITHUB_TOKEN: ${{ steps.github-app-token.outputs.token }}
+          TF_VAR_CLOUDFLARE_TOKEN: ${{ secrets.CLOUDFLARE_TOKEN }}
+        run: terraform apply -auto-approve

@@ -1,0 +1,8 @@
+tmp/
+
+.vscode/
+
+terraform.auto.tfvars.json
+.terraform/
+
+*.env

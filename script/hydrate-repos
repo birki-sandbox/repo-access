@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# Replace ORG with your GitHub organization name
+ORG="birki-sandbox"
+
+# Loop to create 100 repositories
+for i in {1..100}
+do
+  REPO_NAME="repo-$i"
+  gh repo create "$ORG/$REPO_NAME" --public --confirm
+done
