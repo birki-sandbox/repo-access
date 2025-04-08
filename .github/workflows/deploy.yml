@@ -43,7 +43,7 @@ jobs:
           ref: ${{ needs.deployment-check.outputs.sha }}
 
       - name: use github app token
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@v2
         id: github-app-token
         with:
           app-id: ${{ secrets.APP_ID }}

@@ -49,7 +49,7 @@ jobs:
 
       - name: use github app token
         if: steps.branch-deploy.outputs.continue == 'true'
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@v2
         id: github-app-token
         with:
           app-id: ${{ secrets.APP_ID }}
